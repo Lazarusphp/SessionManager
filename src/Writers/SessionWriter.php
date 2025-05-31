@@ -1,6 +1,6 @@
 <?php
 namespace Lazarusphp\SessionManager\Writers;
-use LazarusPhp\LazarusDb\QueryBuilder;
+use LazarusPhp\LazarusDb\QueryBuilder\QueryBuilder;
 use LazarusPhp\DateManager\Date;
 use SessionhandlerInterface;
 use PDO;
