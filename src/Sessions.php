@@ -4,37 +4,169 @@ namespace LazarusPhp\SessionManager;
 use LazarusPhp\DateManager\Date;
 use LazarusPhp\SessionManager\Interfaces\SessionControl;
 use LazarusPhp\SessionManager\CoreFiles\SessionCore;
-use App\System\Writers\SessionWriter;
 use Error;
-use SessionHandler;
-use PDO;
-use PDOException;
+use Exception;
+use LazarusPhp\OpenHandler\Handler;
+use LazarusPhp\SessionManager\Interfaces\HandlerRules;
+use LazarusPhp\SessionManager\Interfaces\SessionInterface;
+use LazarusPhp\SessionManager\Writers\SessionWriter;
+use SessionHandlerInterface;
 
-class Sessions extends SessionCore
+final class Sessions
 {
-    
-    private $config;
-    private $init = false;
+    private static $instance;
+    private array $locked = [];
+    private array $config = [];
+    private SessionInterface|string|null $handle = null;
+    private static $init = false;
 
 
+    // --- Constructor --- //
+
     
+
+    private function __construct()
+    {
+        $this->config = [
+        "days" => 7,
+        "path"=>"/",
+        "table" => "sessions",
+        "name" => "sessions",
+        "domain" => $_SERVER["HTTP_HOST"] ?? '',
+        "secure" => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        "httponly" => false,
+        "samesite" => "lax",
+        ];
+    }
+
+    // --- Create method : entryPoint --- //
+    public static function create()
+    {
+        if(self::$init === false)
+        {
+            self::$instance =  new self();
+            self::$init = true;
+            return self::$instance;
+        }
+        return self::$instance;
+    }
+
+
+    // --- OverWrite config file --- //
+    public function withConfig(?array $config=null):self
+    {
+        // Return the Config;
+        if(array_key_exists("config",$this->locked))
+        {
+            // throw new Exception here to say it cannot be done
+            throw new Exception("Ability to initialisae a new config has already been set");
+        }
+
+        if(!count($config))
+        {
+            throw new Exception("No Parameters passed");
+        }
+
+        foreach($config as $k => $conf)
+        {
+            if (array_key_exists($k, $this->config)) 
+            {
+                // OverWrite the value
+                $this->config[$k] = $conf;
+            }
+        }   
+
+
+        $this->locked["config"] = true;
+        return $this;
+    }
+
+
+    // --- OverWrite with a custom Writer --- //
+    public function withWriter(SessionInterface|string $writer)
+    {
+
+       if(array_key_exists("writer",$this->locked))
+        {
+            throw new Exception("Error : Adding a custom Writer has already Been set");
+        }
+
+        if(!class_exists($writer))
+        {
+            throw new Exception("Class $writer does not exist");
+        }
+
+        $this->handle = $writer;
+        $this->locked["writer"] = true;
+        return $this;
+    }
+
+
+    public function save()
+    {
+
+    if(isset($this->locked["save"]) && $this->locked["save"] === true)
+    {
+        throw new Exception("Cannot Reinstantiate save method");
+    }
+
+        if(session_status() === PHP_SESSION_ACTIVE)
+        {
+            return;
+        }
+
+        $lifetime = $this->config["days"] * 86400;
+
+        // Instantiate writer if a class name is given
+        $handle = is_string($this->handle) ? new $this->handle() : ($this->handle ?? new SessionWriter());
+
+        if (!$handle instanceof SessionInterface) {
+            throw new Exception(
+                "Session Writer " . (is_object($handle) ? get_class($handle) : (string)$handle) .
+                " must implement SessionInterface"
+            );
+        }
+
+       session_set_save_handler($handle);
+        $handle->passConfig($this->config);
+        
+            session_name($this->config['name']);
+
+        session_set_cookie_params(
+            [
+            "lifetime" => $lifetime,
+            "path" => $this->config["path"],
+            "domain"=> $this->config["domain"],
+            "secure"=> $this->config["secure"],
+            "httponly"=>$this->config["httponly"],
+            "samesite"=>$this->config["samesite"],
+            ]);
+        
+
+      session_start();
+
+    if (!isset($_SESSION['_initiated'])) {
+        session_regenerate_id(true);
+        $_SESSION['_initiated'] = true;
+    }
+
+    $this->locked["save"] = true;
+
+    }
+
+
     // Magic Methods to control Sessions.
     public function __set(string $name, string|int $value)
     {
         $_SESSION[$name] = $value;
     }
 
+
     public function __get(string $name)
     {
-        if(array_key_exists($name,$_SESSION))
-        {
-            return $_SESSION[$name];
-        }
-        else
-        {
-            trigger_error("Undefined property: $name");
-        }   
+         return $_SESSION[$name] ?? null;
     }
+
 
     public function __isset(string $name)
     {
@@ -46,54 +178,8 @@ class Sessions extends SessionCore
         unset($_SESSION[$name]);
     }
 
+
     // End Assignment Properties
-
-    public function instantiate(array $classname,array $config = []): void
-    {
-        $config = $this->setConfig($config);
-        // Return config values
-        if(is_array($classname))
-        {
-            if(class_exists($classname[0]))
-            {
-                $handle = new $classname[0]();
-                if (session_status() !== PHP_SESSION_ACTIVE) {
-                
-                    session_set_save_handler($handle);
-                    $handle->passConfig($config);
-
-                    $expiry = Date::asTimestamp(Date::withAddedTime("now", "P" . $config['days'] . "D"));
-                    if (!is_int($expiry)) {
-                        throw new \Exception("Invalid expiration timestamp generated for cookie.");
-                    }
-
-                    
-                    if (!empty($config['sessionName'])) {
-                        session_name($config['sessioname']);
-                    }
-
-                    session_set_cookie_params([
-                        "lifetime" => $expiry,
-                        "path" => ($config["path"] ?? "/"),
-                        "domain"=> $_SERVER['HTTP_HOST'],
-                        "secure"=> ($config["secure"] ?? false),
-                        "httponly"=>($config["httponly"] ?? false),
-                        "samesite"=>($config["samesite"] ?? "lax"),
-                    ]);
-                    
-                    // Load session_start
-                    session_start();
-                }
-            }
-            else
-            {
-                throw new \Exception("Session Handler must be a class");
-            }
-        }
-        else{
-            throw new \Exception("Session Handler must be an array");
-        }
-    }
 
     public function deleteSessions(...$args)
     {
