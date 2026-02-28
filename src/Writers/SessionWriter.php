@@ -42,7 +42,7 @@ class SessionWriter Implements SessionInterface
     {
    
         $deleted = QueryBuilder::table($this->config["table"])->delete()->where("session_id",$sessionID)->save();
-        return $deleted > 0;
+        return true;
     }
 
     public function gc(int $maxlifetime = 1400): int
