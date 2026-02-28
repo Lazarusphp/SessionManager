@@ -10,7 +10,6 @@ use LazarusPhp\OpenHandler\Handler;
 use LazarusPhp\SessionManager\Interfaces\HandlerRules;
 use LazarusPhp\SessionManager\Interfaces\SessionInterface;
 use LazarusPhp\SessionManager\Writers\SessionWriter;
-use SessionHandlerInterface;
 
 final class Sessions
 {
@@ -32,7 +31,7 @@ final class Sessions
         "path"=>"/",
         "table" => "sessions",
         "name" => "sessions",
-        "domain" => $_SERVER["HTTP_HOST"] ?? '',
+        "domain" => ".".$_SERVER["HTTP_HOST"] ?? '',
         "secure" => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
         "httponly" => false,
         "samesite" => "lax",
@@ -130,7 +129,7 @@ final class Sessions
        session_set_save_handler($handle);
         $handle->passConfig($this->config);
         
-            session_name($this->config['name']);
+        session_name($this->config['name']);
 
         session_set_cookie_params(
             [
@@ -142,15 +141,15 @@ final class Sessions
             "samesite"=>$this->config["samesite"],
             ]);
         
-
-      session_start();
-
-    if (!isset($_SESSION['_initiated'])) {
+    session_start();
+    
+    if (!isset($_SESSION['init'])) {
+        $_SESSION['init'] = true;
         session_regenerate_id(true);
-        $_SESSION['_initiated'] = true;
     }
 
     $this->locked["save"] = true;
+    echo session_id();
 
     }
 
