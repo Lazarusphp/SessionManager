@@ -15,7 +15,6 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "lazarusphp/lazarusdb":"^v1.1.0"
-
+        "lazarusphp/lazarusdb":"^v1.0"
     }
 }
