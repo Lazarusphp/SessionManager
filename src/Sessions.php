@@ -1,13 +1,7 @@
 <?php
 
 namespace LazarusPhp\SessionManager;
-use LazarusPhp\DateManager\Date;
-use LazarusPhp\SessionManager\Interfaces\SessionControl;
-use LazarusPhp\SessionManager\CoreFiles\SessionCore;
-use Error;
 use Exception;
-use LazarusPhp\OpenHandler\Handler;
-use LazarusPhp\SessionManager\Interfaces\HandlerRules;
 use LazarusPhp\SessionManager\Interfaces\SessionInterface;
 use LazarusPhp\SessionManager\Writers\SessionWriter;
 
@@ -31,10 +25,10 @@ final class Sessions
         "path"=>"/",
         "table" => "sessions",
         "name" => "sessions",
-        "domain" => ".".$_SERVER["HTTP_HOST"] ?? '',
+        "domain" => isset($_SERVER['HTTP_HOST']) ? '.' . $_SERVER['HTTP_HOST'] : '',
         "secure" => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
         "httponly" => false,
-        "samesite" => "lax",
+        "samesite" => "lax"
         ];
     }
 
@@ -52,7 +46,7 @@ final class Sessions
 
 
     // --- OverWrite config file --- //
-    public function withConfig(?array $config=null):self
+    public function withConfig(array $config):self
     {
         // Return the Config;
         if(array_key_exists("config",$this->locked))
@@ -61,18 +55,19 @@ final class Sessions
             throw new Exception("Ability to initialisae a new config has already been set");
         }
 
-        if(!count($config))
-        {
-            throw new Exception("No Parameters passed");
+        if (empty($config)) {
+        throw new Exception("No parameters passed");
         }
 
         foreach($config as $k => $conf)
         {
-            if (array_key_exists($k, $this->config)) 
-            {
-                // OverWrite the value
-                $this->config[$k] = $conf;
+            if (!array_key_exists($k, $this->config)) {
+            throw new Exception("Unknown config key: $k");
             }
+                // OverWrite the value
+                // Validatate key with conf;
+                $this->validateKeys($k,$conf);
+                $this->config[$k] = $conf;
         }   
 
 
@@ -80,6 +75,24 @@ final class Sessions
         return $this;
     }
 
+private function validateKeys(string $k, mixed $conf): void
+{
+    match ($k) {
+        "path","table","name","domain","samesite","httponly","secure","days"
+        => (empty($conf)) ? throw new Exception("$k cannot be empty"): null,
+        'path', 'table', 'name', 'domain'
+            => is_string($conf) ?: throw new Exception("$k must be a string"),
+        'httponly','secure'
+            => is_bool($conf) ?: throw new Exception("$k must be a boolean"),
+        'days'
+            => is_int($conf) ?: throw new Exception("days must be an integer"),
+        'samesite'
+            => in_array(strtolower($conf), ['strict', 'lax',"none"], true)
+                ?: throw new Exception("samesite must be 'strict','lax' or 'none'"),
+
+        default => null,
+    };
+}
 
     // --- OverWrite with a custom Writer --- //
     public function withWriter(SessionInterface|string $writer)
@@ -90,7 +103,7 @@ final class Sessions
             throw new Exception("Error : Adding a custom Writer has already Been set");
         }
 
-        if(!class_exists($writer))
+        if(is_string($writer) && !class_exists($writer))
         {
             throw new Exception("Class $writer does not exist");
         }
@@ -109,11 +122,9 @@ final class Sessions
         throw new Exception("Cannot Reinstantiate save method");
     }
 
-        if(session_status() === PHP_SESSION_ACTIVE)
-        {
-            return;
-        }
-
+      if (session_status() === PHP_SESSION_ACTIVE) {
+        throw new Exception("Session has already been started");
+    }
         $lifetime = $this->config["days"] * 86400;
 
         // Instantiate writer if a class name is given
@@ -149,7 +160,6 @@ final class Sessions
     }
 
     $this->locked["save"] = true;
-    echo session_id();
 
     }
 
@@ -182,12 +192,12 @@ final class Sessions
 
     public function deleteSessions(...$args)
     {
-        if(count($args) === 0)
-        {
-            session_destroy();
-        }
-        else
-        {
+          if (count($args) === 0) {
+        session_unset();               // clear all data
+        session_destroy();             // kill session
+        session_regenerate_id(true);   // safety
+        return;
+    }
             foreach($args as $arg)
             {
                 if (is_array($arg)) {
@@ -198,6 +208,5 @@ final class Sessions
                     unset($_SESSION[$arg]);
                 }
             }
-        }
     }
 }
