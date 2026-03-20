@@ -137,7 +137,7 @@ private function validateKeys(string $k, mixed $conf): void
             );
         }
 
-       session_set_save_handler($handle);
+       session_set_save_handler($handle,true);
         $handle->passConfig($this->config);
         
         session_name($this->config['name']);

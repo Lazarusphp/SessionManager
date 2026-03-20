@@ -1,8 +1,12 @@
 <?php
 namespace LazarusPhp\SessionManager\Writers;
+
+use LazarusPhp\Database\Facades\DB;
 use LazarusPhp\QueryBuilder\QueryBuilder;
 use LazarusPhp\DateManager\Date;
+use LazarusPhp\Foundation\Facades\DB as FacadesDB;
 use LazarusPhp\SessionManager\Interfaces\SessionInterface;
+use LazarusPhp\SessionManager\Models\Sessions;
 use PDO;
 use PDOException;
 
@@ -26,34 +30,46 @@ class SessionWriter Implements SessionInterface
     {
         return true;
     }
+
     public function read(string $sessionID):string
     {
-        $stmt = QueryBuilder::table($this->config["table"])->select()->where("session_id",$sessionID)->first(PDO::FETCH_ASSOC);
-        return $stmt ? $stmt['data'] : '';
+        $stmt = Sessions::where("session_id",$sessionID)->first(PDO::FETCH_ASSOC);
+        return $stmt ? $stmt["data"] : '';
+    }
+
+    public function updateTimestamp(string $sessionID, string $data): bool
+    {
+        return $this->write($sessionID, $data);
     }
 
     public function write(string $sessionID,string $data):bool
     {
-        $date = Date::withAddedTime("now","P".$this->config["days"]."D")->format("y-m-d H:i:s");  
-        $params = ["session_id"=>$sessionID,"data"=>$data,"expiry"=>$date];
-        return QueryBuilder::table($this->config["table"])->replace($params) ? true : false;
+    $date = Date::withAddedTime("now","P".$this->config["days"]."D")->format("Y-m-d H:i:s");
+    
+    $params = [
+        "session_id" => $sessionID,
+        "data" => $data,
+        "expiry" => $date
+    ];
+
+        return (bool) Sessions::replace($params);
     } 
+    
     public function destroy(string $sessionID): bool
     {
    
-        $deleted = QueryBuilder::table($this->config["table"])->delete()->where("session_id",$sessionID)->save();
-        return true;
+        $deleted =  Sessions::where("session_id",$sessionID)->delete();
+        return (bool) $deleted;
     }
 
     public function gc(int $maxlifetime = 1400): int
 {
     $expiry = Date::create("now")->format("Y-m-d H:i:s");
-    $deleted = QueryBuilder::table($this->config["table"])
-        ->delete()
-        ->where("expiry", "<", $expiry)
-        ->save();
+    $deleted = 
+        Sessions::where("expiry", "<", $expiry)
+        ->delete();
 
-    return $deleted ?: 0;
+    return (int) $deleted;
 }
 
     
