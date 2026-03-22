@@ -165,24 +165,24 @@ private function validateKeys(string $k, mixed $conf): void
 
 
     // Magic Methods to control Sessions.
-    public function __set(string $name, string|int $value)
+    public function put(string $name, string|int $value)
     {
         $_SESSION[$name] = $value;
     }
 
 
-    public function __get(string $name)
+    public function get(string $name)
     {
          return $_SESSION[$name] ?? null;
     }
 
 
-    public function __isset(string $name)
+    public function hasSession(string $name):bool
     {
-        return isset($_SESSION[$name]);
+        isset($_SESSION[$name]) ? true : false;
     }
 
-    public function __unset(string $name)
+    public function forget(string $name)
     {
         unset($_SESSION[$name]);
     }
