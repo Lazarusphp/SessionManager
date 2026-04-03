@@ -2,7 +2,7 @@
 namespace LazarusPhp\SessionManager\Models;
 use LazarusPhp\QueryBuilder\Traits\Relationships;
 use App\Http\Model\Posts;
-use LazarusPhp\Foundation\Model\Model;
+use LazarusPhp\Core\Model;
 
 class Sessions extends Model
 {
