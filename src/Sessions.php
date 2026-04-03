@@ -7,18 +7,18 @@ use LazarusPhp\SessionManager\Writers\SessionWriter;
 
 final class Sessions
 {
-    private static $instance;
+    private static object|null $instance = null;
     private array $locked = [];
     private array $config = [];
     private SessionInterface|string|null $handle = null;
-    private static $init = false;
+    private static bool $init = false;
 
 
     // --- Constructor --- //
 
     
 
-    private function __construct()
+    public function __construct()
     {
         $this->config = [
         "days" => 7,
@@ -30,18 +30,15 @@ final class Sessions
         "httponly" => false,
         "samesite" => "lax"
         ];
+
+        $this->save();
     }
 
     // --- Create method : entryPoint --- //
     public static function create()
     {
-        if(self::$init === false)
-        {
-            self::$instance =  new self();
-            self::$init = true;
-            return self::$instance;
-        }
-        return self::$instance;
+         $instance = new self();
+         return $instance;
     }
 
 
@@ -161,17 +158,18 @@ private function validateKeys(string $k, mixed $conf): void
 
     $this->locked["save"] = true;
 
+    return $this;
     }
 
 
     // Magic Methods to control Sessions.
-    public function put(string $name, string|int $value)
+    public function put(string $name, string|int $value):void
     {
         $_SESSION[$name] = $value;
     }
 
 
-    public function get(string $name)
+    public function get(string $name):string|null
     {
          return $_SESSION[$name] ?? null;
     }
@@ -179,7 +177,7 @@ private function validateKeys(string $k, mixed $conf): void
 
     public function hasSession(string $name):bool
     {
-        isset($_SESSION[$name]) ? true : false;
+        return isset($_SESSION[$name]) ? true : false;
     }
 
     public function forget(string $name)
@@ -190,9 +188,9 @@ private function validateKeys(string $k, mixed $conf): void
 
     // End Assignment Properties
 
-    public function deleteSessions(...$args)
+    public function deleteSessions(string ...$args)
     {
-          if (count($args) === 0) {
+        if (count($args) === 0) {
         session_unset();               // clear all data
         session_destroy();             // kill session
         session_regenerate_id(true);   // safety
